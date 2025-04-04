@@ -8,6 +8,7 @@
 #include <string>
 #include <cstring> 
 #include <map>
+#include <optional>
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -98,6 +99,42 @@ int rateDeviceSuitability(VkPhysicalDevice device) {
     }
     score += deviceProperties.limits.maxImageDimension2D; 
     return score; 
+}
+
+
+struct QueueFamilyIndices {
+    std::optional<uint32_t> graphicsFamily; 
+
+    bool isComplete() {
+        return graphicsFamily.has_value(); 
+    }
+};
+
+QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+    QueueFamilyIndices indices;
+    uint32_t queueFamilyCount = 0; 
+
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount); 
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data()); 
+   
+    int i = 0; 
+    for (const auto& queueFamily : queueFamilies) {
+        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+            indices.graphicsFamily = i; 
+        }
+        if (indices.isComplete()) {
+            break; 
+        }
+        i++; 
+    }
+    return indices; 
+}
+
+bool isDeviceSuitable(VkPhysicalDevice device) {
+    QueueFamilyIndices indices = findQueueFamilies(device);
+    return indices.isComplete(); 
 }
 
 
@@ -194,8 +231,10 @@ private:
 
         std::multimap<int, VkPhysicalDevice> candidates; 
         for (const auto& device : devices) {
-            int score = rateDeviceSuitability(device); 
-            candidates.insert(std::make_pair(score, device)); 
+            if (isDeviceSuitable(device)) {
+                int score = rateDeviceSuitability(device);
+                candidates.insert(std::make_pair(score, device));
+            }
         }
         if (candidates.rbegin()->first > 0) {
             physicalDevice = candidates.rbegin()->second; 
